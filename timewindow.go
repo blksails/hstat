@@ -264,6 +264,10 @@ func (w *TimeWindow) LastUpdateTime() time.Time {
 
 // Value 实现 sql.Valuer 接口
 func (w *TimeWindow) Value() (driver.Value, error) {
+	if w == nil {
+		return nil, nil
+	}
+
 	w.mu.RLock()
 	defer w.mu.RUnlock()
 
@@ -288,6 +292,10 @@ func (w *TimeWindow) Value() (driver.Value, error) {
 
 // Scan 实现 sql.Scanner 接口
 func (w *TimeWindow) Scan(value interface{}) error {
+	if value == nil {
+		return nil
+	}
+
 	w.mu.Lock()
 	defer w.mu.Unlock()
 
