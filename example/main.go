@@ -19,6 +19,12 @@ func simulateUserActivity(window *hstat.TimeWindow, done chan struct{}) {
 	for {
 		select {
 		case <-ticker.C:
+			// 随机暂停，模拟无活动期间
+			if rand.Float64() < 0.1 { // 10%的概率暂停
+				time.Sleep(2 * time.Second)
+				continue
+			}
+
 			// 随机模拟用户上线或下线
 			if rand.Float64() > 0.5 {
 				// 模拟1-3人上线

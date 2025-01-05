@@ -172,8 +172,11 @@ func DefaultHistogramOption() *HistogramOption {
 
 // PrintHistogram 返回时间窗口内的数据分布情况（垂直柱状图）
 func (w *TimeWindow) PrintHistogram(opt *HistogramOption) string {
-	w.mu.RLock()
-	defer w.mu.RUnlock()
+	w.mu.Lock()
+	defer w.mu.Unlock()
+
+	// 在显示之前先更新窗口状态
+	w.rotate(time.Now())
 
 	if opt == nil {
 		opt = DefaultHistogramOption()
@@ -335,8 +338,11 @@ type TimeWindowData struct {
 
 // GetData 返回时间窗口中的所有数据，按时间从新到旧排序
 func (w *TimeWindow) GetData() []TimeWindowData {
-	w.mu.RLock()
-	defer w.mu.RUnlock()
+	w.mu.Lock() // 改用写锁，因为要修改状态
+	defer w.mu.Unlock()
+
+	// 在获取数据前先更新窗口状态
+	w.rotate(time.Now())
 
 	now := time.Now()
 	result := make([]TimeWindowData, w.size)
