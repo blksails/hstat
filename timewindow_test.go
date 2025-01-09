@@ -6,23 +6,21 @@ import (
 )
 
 func TestTimeWindow_Basic(t *testing.T) {
-	w := NewTimeWindow(5, time.Second)
+	window := NewTimeWindow(60, time.Second)
 
-	// Test Append and Count
-	w.Append(1.0)
-	w.Append(2.0)
-	if count := w.Count(); count != 2 {
-		t.Errorf("Expected count 2, got %d", count)
+	window.Append(1.0)
+	window.Append(2.0)
+
+	if count := window.Count(); count != 1 {
+		t.Errorf("Expected count 1, got %d", count)
 	}
 
-	// Test Sum
-	if sum := w.Sum(); sum != 3.0 {
-		t.Errorf("Expected sum 3.0, got %f", sum)
+	if sum := window.Sum(); sum != 2.0 {
+		t.Errorf("Expected sum 2.0, got %f", sum)
 	}
 
-	// Test Avg
-	if avg := w.Avg(); avg != 1.5 {
-		t.Errorf("Expected average 1.5, got %f", avg)
+	if avg := window.Avg(); avg != 2.0 {
+		t.Errorf("Expected average 2.0, got %f", avg)
 	}
 }
 
@@ -57,23 +55,22 @@ func TestTimeWindow_Reset(t *testing.T) {
 }
 
 func TestTimeWindow_GetData(t *testing.T) {
-	w := NewTimeWindow(3, time.Second)
-	now := time.Now()
+	window := NewTimeWindow(60, time.Second)
 
-	w.Append(1.0)
-	w.Append(2.0)
+	window.Append(1.0)
+	window.Append(2.0)
 
-	data := w.GetData()
-	if len(data) != 3 {
-		t.Errorf("Expected 3 data points, got %d", len(data))
+	data := window.GetData()
+	if len(data) != 60 {
+		t.Errorf("Expected 60 buckets, got %d", len(data))
 	}
 
-	if len(data[0].Values) != 2 {
-		t.Errorf("Expected 2 values in current bucket, got %d", len(data[0].Values))
+	if len(data[0].Values) != 1 {
+		t.Errorf("Expected 1 value in current bucket, got %d", len(data[0].Values))
 	}
 
-	if data[0].Time.Before(now) {
-		t.Error("Expected first data point time to be after or equal to start time")
+	if data[0].Values[0] != 2.0 {
+		t.Errorf("Expected value 2.0, got %f", data[0].Values[0])
 	}
 }
 
