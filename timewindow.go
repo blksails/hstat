@@ -12,7 +12,7 @@ import (
 // TimeWindow 表示一个基于时间的滑动窗口
 type TimeWindow struct {
 	mu         sync.RWMutex
-	buckets    [][]float64   // 存储数据的桶
+	buckets    []float64     // 改为单个float64值的切片
 	size       int           // 窗口大小(桶的数量)
 	duration   time.Duration // 每个桶的时间跨度
 	lastTime   time.Time     // 上次更新时间
@@ -26,7 +26,7 @@ type TimeWindow struct {
 // chartHeight: 图表最大高度（如果 <= 0，则使用默认值20）
 func NewTimeWindow(size int, duration time.Duration) *TimeWindow {
 	return &TimeWindow{
-		buckets:  make([][]float64, size),
+		buckets:  make([]float64, size),
 		size:     size,
 		duration: duration,
 		lastTime: time.Now(),
@@ -41,8 +41,8 @@ func (w *TimeWindow) Append(value float64) {
 	now := time.Now()
 	w.rotate(now)
 
-	// 添加数据到当前桶
-	w.buckets[w.cursor] = append(w.buckets[w.cursor], value)
+	// 直接设置当前桶的值
+	w.buckets[w.cursor] = value
 }
 
 // rotate 根据时间推移调整窗口
@@ -55,14 +55,14 @@ func (w *TimeWindow) rotate(now time.Time) {
 	// 如果经过的时间超过窗口大小，清空所有桶
 	if passed >= w.size {
 		for i := range w.buckets {
-			w.buckets[i] = w.buckets[i][:0]
+			w.buckets[i] = 0
 		}
 		w.cursor = 0
 	} else {
 		// 清空过期的桶
 		for i := 0; i < passed; i++ {
 			w.cursor = (w.cursor + 1) % w.size
-			w.buckets[w.cursor] = w.buckets[w.cursor][:0]
+			w.buckets[w.cursor] = 0
 		}
 	}
 
@@ -75,22 +75,22 @@ func (w *TimeWindow) Sum() float64 {
 	defer w.mu.RUnlock()
 
 	var sum float64
-	for _, bucket := range w.buckets {
-		for _, v := range bucket {
-			sum += v
-		}
+	for _, v := range w.buckets {
+		sum += v
 	}
 	return sum
 }
 
-// Count 返回窗口内的值的数量
+// Count 返回窗口内的非零值的数量
 func (w *TimeWindow) Count() int {
 	w.mu.RLock()
 	defer w.mu.RUnlock()
 
 	var count int
-	for _, bucket := range w.buckets {
-		count += len(bucket)
+	for _, v := range w.buckets {
+		if v != 0 {
+			count++
+		}
 	}
 	return count
 }
@@ -114,16 +114,9 @@ func (w *TimeWindow) Inc(delta float64) {
 
 	now := time.Now()
 	w.rotate(now)
-	w.lastUpdate = now // 记录更新时间
+	w.lastUpdate = now
 
-	// 如果当前桶为空，初始化为0
-	if len(w.buckets[w.cursor]) == 0 {
-		w.buckets[w.cursor] = append(w.buckets[w.cursor], 0)
-	}
-
-	// 累加到当前桶的最后一个值
-	lastIdx := len(w.buckets[w.cursor]) - 1
-	w.buckets[w.cursor][lastIdx] += delta
+	w.buckets[w.cursor] += delta
 }
 
 // Dec 在当前时间窗口中递减值
@@ -133,16 +126,9 @@ func (w *TimeWindow) Dec(delta float64) {
 
 	now := time.Now()
 	w.rotate(now)
-	w.lastUpdate = now // 记录更新时间
+	w.lastUpdate = now
 
-	// 如果当前桶为空，初始化为0
-	if len(w.buckets[w.cursor]) == 0 {
-		w.buckets[w.cursor] = append(w.buckets[w.cursor], 0)
-	}
-
-	// 从当前桶的最后一个值中减去delta
-	lastIdx := len(w.buckets[w.cursor]) - 1
-	w.buckets[w.cursor][lastIdx] -= delta
+	w.buckets[w.cursor] -= delta
 }
 
 // Reset 重置当前桶的值为指定值
@@ -153,9 +139,7 @@ func (w *TimeWindow) Reset(value float64) {
 	now := time.Now()
 	w.rotate(now)
 
-	// 清空当前桶并设置新值
-	w.buckets[w.cursor] = w.buckets[w.cursor][:0]
-	w.buckets[w.cursor] = append(w.buckets[w.cursor], value)
+	w.buckets[w.cursor] = value
 }
 
 // HistogramOption 用于配置直方图显示选项
@@ -196,8 +180,8 @@ func (w *TimeWindow) PrintHistogram(opt *HistogramOption) string {
 		idx := (w.cursor - i + w.size) % w.size
 		times[i] = -i * int(w.duration.Seconds())
 
-		if len(w.buckets[idx]) > 0 {
-			value := w.buckets[idx][len(w.buckets[idx])-1]
+		if w.buckets[idx] > 0 {
+			value := w.buckets[idx]
 			values[i] = value
 			if value > maxValue {
 				maxValue = value
@@ -275,7 +259,7 @@ func (w *TimeWindow) Value() (driver.Value, error) {
 	defer w.mu.RUnlock()
 
 	data := struct {
-		Buckets    [][]float64   `json:"buckets"`
+		Buckets    []float64     `json:"buckets"`
 		Size       int           `json:"size"`
 		Duration   time.Duration `json:"duration"`
 		LastTime   time.Time     `json:"last_time"`
@@ -303,7 +287,7 @@ func (w *TimeWindow) Scan(value interface{}) error {
 	defer w.mu.Unlock()
 
 	var data struct {
-		Buckets    [][]float64   `json:"buckets"`
+		Buckets    []float64     `json:"buckets"`
 		Size       int           `json:"size"`
 		Duration   time.Duration `json:"duration"`
 		LastTime   time.Time     `json:"last_time"`
@@ -336,28 +320,22 @@ type TimeWindowData struct {
 	Values []float64 `json:"values"` // 该时间点的所有值
 }
 
-// GetData 返回时间窗口中的所有数据，按时间从新到旧排序
+// GetData 返回时间窗口中的所有数据
 func (w *TimeWindow) GetData() []TimeWindowData {
-	w.mu.Lock() // 改用写锁，因为要修改状态
+	w.mu.Lock()
 	defer w.mu.Unlock()
 
-	// 在获取数据前先更新窗口状态
 	w.rotate(time.Now())
 
 	now := time.Now()
 	result := make([]TimeWindowData, w.size)
 
-	// 从当前游标位置向前收集数据
 	for i := 0; i < w.size; i++ {
-		// 计算实际索引，从当前游标向前遍历
 		idx := (w.cursor - i + w.size) % w.size
-
-		// 计算该桶的时间点
 		bucketTime := now.Add(-time.Duration(i) * w.duration)
 
-		// 复制该桶的数据
-		values := make([]float64, len(w.buckets[idx]))
-		copy(values, w.buckets[idx])
+		// 将单个值包装在切片中保持兼容性
+		values := []float64{w.buckets[idx]}
 
 		result[i] = TimeWindowData{
 			Time:   bucketTime,
@@ -368,14 +346,10 @@ func (w *TimeWindow) GetData() []TimeWindowData {
 	return result
 }
 
-// GetLatestValue 返回最新的一个值，如果没有数据则返回 0 和 false
+// GetLatestValue 返回最新的值
 func (w *TimeWindow) GetLatestValue() (float64, bool) {
 	w.mu.RLock()
 	defer w.mu.RUnlock()
 
-	if len(w.buckets[w.cursor]) == 0 {
-		return 0, false
-	}
-
-	return w.buckets[w.cursor][len(w.buckets[w.cursor])-1], true
+	return w.buckets[w.cursor], true
 }
