@@ -301,6 +301,7 @@ func (w *TimeWindow) Scan(value interface{}) error {
 	}
 
 	if err := json.Unmarshal(bytes, &data); err != nil {
+		data.Duration = 5 * time.Minute
 		return nil
 	}
 
