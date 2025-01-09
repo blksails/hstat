@@ -301,7 +301,7 @@ func (w *TimeWindow) Scan(value interface{}) error {
 	}
 
 	if err := json.Unmarshal(bytes, &data); err != nil {
-		return err
+		return nil
 	}
 
 	w.buckets = data.Buckets
