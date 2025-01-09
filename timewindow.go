@@ -47,6 +47,9 @@ func (w *TimeWindow) Append(value float64) {
 
 // rotate 根据时间推移调整窗口
 func (w *TimeWindow) rotate(now time.Time) {
+	if w.duration == 0 {
+		w.duration = 5 * time.Minute
+	}
 	passed := int(now.Sub(w.lastTime) / w.duration)
 	if passed <= 0 {
 		return
